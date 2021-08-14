@@ -15,9 +15,9 @@ const apiRouter = require('./routes/mainRouter.js');
 const spotifyRouter = require('./routes/spotifyRouter.js');
 const settingsRouter = require('./routes/settingsRouter.js');
 
-const spotifyClientId = '8f48d471fce74b5db4b386614dc36903';
+const spotifyClientId = process.env.SPOTIFY_CLIENT_ID;//'8f48d471fce74b5db4b386614dc36903';
 const scopes = 'user-read-email user-top-read user-read-recently-played user-follow-modify user-read-currently-playing user-library-read';
-const spotifyCallbackURI = 'http://localhost:3000/callback';
+const spotifyCallbackURI = process.env.SPOTIFY_CALLBACK_URI;//'http://localhost:3000/callback';
 
 const authController = require('./controller/authController.js');
 const settingsController = require('./controller/settingsController');
@@ -40,10 +40,10 @@ app.get('/login', (req, res) => {
     '&redirect_uri=' + encodeURIComponent(spotifyCallbackURI));
 });
 
-app.get('/callback', 
-  authController.getAuthToken, 
-  authController.getUserInfo, 
-  settingsController.createInitialSettings, 
+app.get('/callback',
+  authController.getAuthToken,
+  authController.getUserInfo,
+  settingsController.createInitialSettings,
   (req, res) => {
   console.log(res.locals.username, 'Successfully Authorized in DB');
   const profileUrl = appRootDomain + '/profile/' + res.locals.username
@@ -67,7 +67,7 @@ app.use((err, req, res, next) => {
 
   const errorObj = Object.assign({}, defaultErr, err);
   console.log(errorObj.log);
-  return res.status(errorObj.status).json(errorObj.message); 
+  return res.status(errorObj.status).json(errorObj.message);
 });
 
 

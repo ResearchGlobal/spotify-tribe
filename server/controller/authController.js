@@ -1,30 +1,34 @@
 require('dotenv').config();
 const db = require('../models/pgPool');
-const spotifyCallbackURI = 'http://localhost:3000/callback';
-const spotifyClientId = '8f48d471fce74b5db4b386614dc36903';
+const spotifyCallbackURI = process.env.SPOTIFY_CALLBACK_URI;
+const spotifyClientId = process.env.SPOTIFY_CLIENT_ID;
 const spotifySecret = process.env.SPOTIFY_SECRET;
 const fetch = require('node-fetch');
 
 const authController = {};
 
 authController.getAuthToken = (req, res, next) => {
+  console.log(process.env.SPOTIFY_CALLBACK_URI,
+process.env.SPOTIFY_CLIENT_ID,
+process.env.SPOTIFY_SECRET)
   console.log('getting access token');
-
-  fetch('https://accounts.spotify.com/api/token' + 
-    '?grant_type=authorization_code' + 
-    '&code=' + encodeURIComponent(req.query.code) + 
+  console.log("Step 0 REQ body:", req.body);
+  console.log("REQ CODE:", req.query.code)
+  fetch('https://accounts.spotify.com/api/token' +
+    '?grant_type=authorization_code' +
+    '&code=' + encodeURIComponent(req.query.code) +
     '&redirect_uri=' + encodeURIComponent(spotifyCallbackURI) +
-    '&client_id=' + encodeURIComponent(spotifyClientId) + 
+    '&client_id=' + encodeURIComponent(spotifyClientId) +
     '&client_secret=' + encodeURIComponent(spotifySecret),
     { method: 'POST',
       headers: { 'Content-Type' : 'application/x-www-form-urlencoded' },
     })
     .then(data => data.json())
     .then(d => {
-      console.log(d);
+      console.log("STEP 1:",d);
       // I need to add timezone math to this table later for reauth checks
       const accessParams = [d.access_token, d.token_type, d.scope, d.expires_in, d.refresh_token];
-      const accessQuery = `INSERT INTO users 
+      const accessQuery = `INSERT INTO users
       (access_token, token_type, scope, token_life_seconds, refresh_token)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING id, access_token;`;
@@ -52,16 +56,16 @@ authController.getUserInfo = (req, res, next) => {
     }
   })
   .then(data => data.json())
-  .then(u => { 
+  .then(u => {
     console.log(u);
     res.locals.username = u.id;
     const updateParams = [u.id, u.display_name, u.email, u.external_urls.spotify, u.href, u.uri, res.locals.userId];
-    const updateQuery = `UPDATE users 
-    SET username = $1, display_name = $2, email = $3, spotify_url = $4, 
+    const updateQuery = `UPDATE users
+    SET username = $1, display_name = $2, email = $3, spotify_url = $4,
     api_href = $5, uri = $6, token_set_time = ${~~(Date.now() / 1000)}
     WHERE id = $7
     RETURNING *;`;
-    
+
     return db.query(updateQuery,updateParams)
   })
   .then(() => next())
@@ -83,7 +87,7 @@ authController.getSpotifyTokenFromDB = (req, res, next) => {
       if (token_set_time + token_life_seconds < timeNow){
         res.locals.refreshToken = refresh_token;
         authController.getAuthToken(req, res, next);
-      } 
+      }
       else {
         res.locals.authToken = access_token;
         next();
