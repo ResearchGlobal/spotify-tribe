@@ -9,6 +9,7 @@ const { default: axios } = require('axios');
 const authController = {};
 
 authController.getAuthToken = (req, res, next) => {
+  console.log("REQ QUERY CODE:",req.query.code);
   axios.post('https://accounts.spotify.com/api/token' +
     '?grant_type=authorization_code' +
     '&code=' + encodeURIComponent(req.query.code) +
