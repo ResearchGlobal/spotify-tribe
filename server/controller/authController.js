@@ -8,12 +8,6 @@ const fetch = require('node-fetch');
 const authController = {};
 
 authController.getAuthToken = (req, res, next) => {
-  console.log(process.env.SPOTIFY_CALLBACK_URI,
-process.env.SPOTIFY_CLIENT_ID,
-process.env.SPOTIFY_SECRET)
-  console.log('getting access token');
-  console.log("Step 0 REQ body:", req.body);
-  console.log("REQ CODE:", req.query.code)
   fetch('https://accounts.spotify.com/api/token' +
     '?grant_type=authorization_code' +
     '&code=' + encodeURIComponent(req.query.code) +
@@ -25,7 +19,7 @@ process.env.SPOTIFY_SECRET)
     })
     .then(data => data.json())
     .then(d => {
-      console.log("STEP 1:",d);
+      console.log('STEP 1:',d);
       // I need to add timezone math to this table later for reauth checks
       const accessParams = [d.access_token, d.token_type, d.scope, d.expires_in, d.refresh_token];
       const accessQuery = `INSERT INTO users
@@ -57,7 +51,7 @@ authController.getUserInfo = (req, res, next) => {
   })
   .then(data => data.json())
   .then(u => {
-    console.log(u);
+    console.log('STEP 2:',u);
     res.locals.username = u.id;
     const updateParams = [u.id, u.display_name, u.email, u.external_urls.spotify, u.href, u.uri, res.locals.userId];
     const updateQuery = `UPDATE users
@@ -76,20 +70,26 @@ authController.getUserInfo = (req, res, next) => {
 }
 
 authController.getSpotifyTokenFromDB = (req, res, next) => {
+
+  console.log("req.query.user",req.query.user);
   const queryParams = [req.query.user]
-  const query = `SELECT access_token, refresh_token, token_life_seconds, token_set_time
+  const query = `SELECT access_token, refresh_token, token_life_seconds, token_set_time, spotify_url, api_href
   FROM users WHERE username = $1`
 
   return db.query(query, queryParams)
     .then(data => {
-      const { access_token, refresh_token, token_life_seconds, token_set_time } = data.rows[0]
+      const { access_token, refresh_token, token_life_seconds, token_set_time, spotify_url, api_href} = data.rows[0]
       const timeNow = ~~(Date.now() / 1000)
       if (token_set_time + token_life_seconds < timeNow){
+        console.log("path A")
         res.locals.refreshToken = refresh_token;
         authController.getAuthToken(req, res, next);
       }
       else {
+        console.log("path B")
         res.locals.authToken = access_token;
+        res.locals.spotifyURL = spotify_url;
+        res.locals.apiHref = api_href;
         next();
       }
     })
