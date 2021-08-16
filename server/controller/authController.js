@@ -4,52 +4,55 @@ const spotifyCallbackURI = process.env.SPOTIFY_CALLBACK_URI;
 const spotifyClientId = process.env.SPOTIFY_CLIENT_ID;
 const spotifySecret = process.env.SPOTIFY_SECRET;
 const fetch = require('node-fetch');
+const { default: axios } = require('axios');
 
 const authController = {};
 
 authController.getAuthToken = (req, res, next) => {
-  fetch('https://accounts.spotify.com/api/token' +
+  axios.post('https://accounts.spotify.com/api/token' +
     '?grant_type=authorization_code' +
     '&code=' + encodeURIComponent(req.query.code) +
     '&redirect_uri=' + encodeURIComponent(spotifyCallbackURI) +
     '&client_id=' + encodeURIComponent(spotifyClientId) +
-    '&client_secret=' + encodeURIComponent(spotifySecret),
-    { method: 'POST',
-      headers: { 'Content-Type' : 'application/x-www-form-urlencoded' },
-    })
-    .then(data => data.json())
-    .then(d => {
-      console.log('STEP 1:',d);
-      // I need to add timezone math to this table later for reauth checks
-      const accessParams = [d.access_token, d.token_type, d.scope, d.expires_in, d.refresh_token];
-      const accessQuery = `INSERT INTO users
-      (access_token, token_type, scope, token_life_seconds, refresh_token)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, access_token;`;
-      return db.query(accessQuery, accessParams)
-    })
-    .then(queryResult =>{
-      res.locals.userId = queryResult.rows[0].id;
-      res.locals.authToken = queryResult.rows[0].access_token
-      console.log(res.locals);
-      return next();
-    })
-    .catch(err => next({
-      message: {err: 'error in authController.getAuthToken'},
-      log: `error in authController.getAuthToken ERROR: ${err}`
-    }))
+    '&client_secret=' + encodeURIComponent(spotifySecret),null,
+    { headers:
+        { 'Content-Type' : 'application/x-www-form-urlencoded'},
+    }
+  )
+  .then(data => data.data)
+  .then(d => {
+    console.log('STEP 1:',d);
+    // I need to add timezone math to this table later for reauth checks
+    const accessParams = [d.access_token, d.token_type, d.scope, d.expires_in, d.refresh_token];
+    const accessQuery = `INSERT INTO users
+    (access_token, token_type, scope, token_life_seconds, refresh_token)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, access_token;`;
+    return db.query(accessQuery, accessParams)
+  })
+  .then(queryResult =>{
+    res.locals.userId = queryResult.rows[0].id;
+    res.locals.authToken = queryResult.rows[0].access_token
+    console.log(res.locals);
+    return next();
+  })
+  .catch(err => next({
+    message: {err: 'error in authController.getAuthToken'},
+    log: `error in authController.getAuthToken ERROR: ${err}`
+  }))
 };
 
 authController.getUserInfo = (req, res, next) => {
-  console.log('getting user info')
-  fetch('https://api.spotify.com/v1/me', {
+  console.log('getting user info');
+
+  axios.get('https://api.spotify.com/v1/me',{
     headers: {
       'Accept' : 'application/json',
       'Content-Type' : 'application/json',
       'Authorization' : `Bearer ${res.locals.authToken}`
     }
   })
-  .then(data => data.json())
+  .then(data => data.data)
   .then(u => {
     console.log('STEP 2:',u);
     res.locals.username = u.id;
